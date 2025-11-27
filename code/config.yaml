@@ -67,7 +67,7 @@ max_steps: 300
 learning_rate: 2e-4
 batch_size: 4
 gradient_accumulation_steps: 4
-sequence_len: 512
+sequence_len: 512 # works well for the recipe dataset
 lr_scheduler: cosine
 warmup_steps: 50
 bf16: true
@@ -82,3 +82,4 @@ optim: paged_adamw_8bit
 output_dir: ./outputs/lora_recipe
 wandb_project: qwen_recipe
 wandb_run_name: lora-finetuning-recipe
+hub_model_name: Qwen2.5-1.5B-QLoRA-Recipe 

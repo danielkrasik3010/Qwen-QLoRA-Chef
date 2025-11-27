@@ -1,7 +1,6 @@
 """
 Fine-tune a model on recipe generation dataset using QLoRA (Quantized Low-Rank Adaptation).
 Uses recipe-specific preprocessing with assistant-only masking.
-Adapted from Data_Preprocessing_pre_final (1).ipynb preprocess_recipe_samples().
 Fully integrated with shared utilities and config.yaml.
 """
 
@@ -65,7 +64,6 @@ class PaddingCollator:
 def preprocess_samples(examples, tokenizer, task_instruction, max_length, cfg):
     """
     Tokenize recipe samples and apply assistant-only masking for causal LM.
-    (Adapted from Data_Preprocessing_pre_final (1).ipynb preprocess_recipe_samples())
     
     Args:
         examples: Batch dictionary with 'title', 'ingredients', 'directions', 'NER' fields
@@ -194,7 +192,9 @@ def train_model(cfg, model, tokenizer, train_data, val_data):
         bf16=cfg.get("bf16", True),
         optim=cfg.get("optim", "paged_adamw_8bit"),
         eval_strategy="steps",
+        eval_steps=cfg.get("save_steps", 100),  # Evaluate every N steps (same as save_steps)
         save_strategy="steps",
+        save_steps=cfg.get("save_steps", 100),  # Save checkpoint every N steps
         logging_steps=cfg.get("logging_steps", 25),
         save_total_limit=cfg.get("save_total_limit", 2),
         report_to="wandb",
@@ -216,6 +216,56 @@ def train_model(cfg, model, tokenizer, train_data, val_data):
     model.save_pretrained(save_dir)
     tokenizer.save_pretrained(save_dir)
     print(f"💾 Saved LoRA adapters to {save_dir}")
+    
+    # Optional: Push to Hugging Face Hub
+    hf_username = os.getenv("HF_USERNAME")
+    hub_model_name = cfg.get("hub_model_name", None)
+    
+    if hf_username and hub_model_name:
+        push_to_hub(model, tokenizer, hub_model_name, hf_username)
+    elif hf_username:
+        # Default model name if not specified
+        push_to_hub(model, tokenizer, "Qwen2.5-1.5B-QLoRA-Recipe0", hf_username)
+    else:
+        print("\n💡 To push to Hugging Face Hub, set HF_USERNAME in .env file")
+
+
+def push_to_hub(model, tokenizer, model_name, hf_username):
+    """
+    Push LoRA adapters and merged model to Hugging Face Hub.
+    Similar to Colab version but uses environment variables.
+    
+    Args:
+        model: The trained PEFT model (with LoRA adapters)
+        tokenizer: The tokenizer
+        model_name: Model name (e.g., "Qwen2.5-1.5B-QLoRA-Recipe0")
+        hf_username: Your Hugging Face username
+    """
+    model_id = f"{hf_username}/{model_name}"
+    
+    try:
+        print(f"\n📤 Pushing to Hugging Face Hub: {model_id}")
+        
+        # Push LoRA adapters
+        print("  → Pushing LoRA adapters...")
+        model.push_to_hub(f"{model_id}-adapters", private=False)
+        
+        # Merge and push full model
+        print("  → Merging adapters and pushing full model...")
+        merged_model = model.merge_and_unload()
+        merged_model.push_to_hub(model_id, private=False)
+        
+        # Push tokenizer
+        print("  → Pushing tokenizer...")
+        tokenizer.push_to_hub(model_id)
+        
+        print(f"\n✅ Successfully pushed to: https://huggingface.co/{model_id}")
+        print(f"   Adapters: https://huggingface.co/{model_id}-adapters")
+        
+    except Exception as e:
+        print(f"\n❌ Error pushing to Hugging Face: {e}")
+        print("   Make sure you're logged in with: huggingface-cli login")
+        print("   Or set HF_TOKEN in your .env file")
 
 
 # ---------------------------------------------------------------------------
