@@ -1,0 +1,41 @@
+# ================================
+# Core Framework (CUDA 11.8)
+# ================================
+# pip install torch==2.7.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# NOTE: Install PyTorch separately:
+
+# ================================
+# Hugging Face Ecosystem
+# ================================
+transformers>=4.56.1
+datasets>=4.0.0
+accelerate>=1.11.0
+peft>=0.17.1
+huggingface_hub>=0.20.0
+hf_transfer
+
+# ================================
+# Quantization / Memory Efficiency
+# ================================
+bitsandbytes>=0.43.0
+triton>=2.1.0
+inquirer
+# ================================
+# Experiment Tracking & Utils
+# ================================
+wandb>=0.22.0
+python-dotenv>=1.1.1
+PyYAML>=6.0.2
+tqdm>=4.65.0
+numpy>=1.26.0
+
+# ================================
+# OpenAI API
+# ================================
+openai>=2.7.0
+
+# ================================
+# Metrics
+# ================================
+evaluate[rouge]>=0.4.0
+rouge_score
