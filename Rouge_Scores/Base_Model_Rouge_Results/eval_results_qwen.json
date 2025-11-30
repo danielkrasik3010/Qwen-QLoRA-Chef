@@ -1,0 +1,7 @@
+{
+  "model_name": "Qwen/Qwen2.5-1.5B-Instruct",
+  "num_samples": 200,
+  "rouge1": 0.3052601650183084,
+  "rouge2": 0.07062790287388587,
+  "rougeL": 0.16772462973488583
+}

@@ -1,0 +1,7 @@
+{
+  "model_name": "google/gemma-2-2b-it",
+  "num_samples": 200,
+  "rouge1": 0.30076379344762494,
+  "rouge2": 0.07994510400561679,
+  "rougeL": 0.17247927495754717
+}

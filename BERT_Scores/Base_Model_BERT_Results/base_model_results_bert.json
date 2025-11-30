@@ -1,0 +1,7 @@
+{
+  "model_name": "Qwen/Qwen2.5-1.5B-Instruct",
+  "num_samples": 200,
+  "bert_precision": 0.8169527649879456,
+  "bert_recall": 0.8568416833877563,
+  "bert_f1": 0.8363305926322937
+}

@@ -1,0 +1,21 @@
+{
+  "timestamp": "2025-11-30T17:43:56.533892",
+  "model_path": "Qwen/Qwen2.5-1.5B-Instruct",
+  "model_type": "full",
+  "base_model": null,
+  "benchmarks": {
+    "mmlu": {
+      "accuracy": 0.7070707070707071,
+      "samples": 99,
+      "subjects": [
+        "high_school_psychology",
+        "logical_fallacies",
+        "moral_disputes"
+      ]
+    },
+    "hellaswag": {
+      "accuracy_norm": 0.66,
+      "samples": 100
+    }
+  }
+}

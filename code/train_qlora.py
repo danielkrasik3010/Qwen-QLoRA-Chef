@@ -1,7 +1,29 @@
 """
-Fine-tune a model on recipe generation dataset using QLoRA (Quantized Low-Rank Adaptation).
-Uses recipe-specific preprocessing with assistant-only masking.
-Fully integrated with shared utilities and config.yaml.
+train_qlora.py
+
+Fine-tune a language model on recipe generation using QLoRA (Quantized Low-Rank Adaptation).
+
+This module implements the complete training pipeline for fine-tuning a causal language
+model on recipe generation tasks. It uses 4-bit quantization (QLoRA) for memory efficiency
+and applies assistant-only masking to train the model to generate recipe outputs while
+preserving the instruction-following format.
+
+Key Features:
+    - 4-bit quantization using bitsandbytes for memory-efficient training
+    - LoRA (Low-Rank Adaptation) for parameter-efficient fine-tuning
+    - Assistant-only masking to focus loss computation on generated content
+    - Integration with Weights & Biases for experiment tracking
+    - Automatic push to Hugging Face Hub
+
+Dependencies:
+    - PyTorch with CUDA support
+    - Transformers library with Trainer API
+    - PEFT library for LoRA configuration
+    - bitsandbytes for 4-bit quantization
+    - wandb for experiment tracking
+
+Configuration:
+    All hyperparameters are loaded from config.yaml via the config_utils module.
 """
 
 import os
@@ -153,10 +175,32 @@ def preprocess_samples(examples, tokenizer, task_instruction, max_length, cfg):
 
 
 def train_model(cfg, model, tokenizer, train_data, val_data):
-    """Tokenize datasets, configure Trainer, and run LoRA fine-tuning."""
+    """
+    Tokenize datasets, configure Trainer, and run LoRA fine-tuning.
+
+    This function handles the complete training workflow:
+    1. Tokenizes training and validation datasets with assistant-only masking
+    2. Configures the Hugging Face Trainer with appropriate arguments
+    3. Runs the training loop with periodic checkpointing
+    4. Saves LoRA adapters and optionally pushes to Hugging Face Hub
+
+    Parameters
+    ----------
+    cfg : dict
+        Configuration dictionary containing training hyperparameters,
+        model settings, and output paths.
+    model : PreTrainedModel
+        The base model with LoRA adapters attached.
+    tokenizer : PreTrainedTokenizer
+        The tokenizer for the model.
+    train_data : Dataset
+        Hugging Face Dataset containing training samples.
+    val_data : Dataset
+        Hugging Face Dataset containing validation samples.
+    """
     task_instruction = cfg["task_instruction"]
 
-    print("\n📚 Tokenizing datasets...")
+    print("\n[INFO] Tokenizing datasets...")
     tokenized_train = train_data.map(
         lambda e: preprocess_samples(
             e, tokenizer, task_instruction, cfg["sequence_len"], cfg  # ADD cfg
@@ -208,64 +252,76 @@ def train_model(cfg, model, tokenizer, train_data, val_data):
         data_collator=collator,
     )
 
-    print("\n🎯 Starting LoRA fine-tuning...")
+    print("\n[INFO] Starting LoRA fine-tuning...")
     trainer.train()
-    print("\n✅ Training complete!")
+    print("\n[INFO] Training complete!")
 
     save_dir = os.path.join(output_dir, "lora_adapters")
     model.save_pretrained(save_dir)
     tokenizer.save_pretrained(save_dir)
-    print(f"💾 Saved LoRA adapters to {save_dir}")
-    
+    print(f"[INFO] Saved LoRA adapters to {save_dir}")
+
     # Optional: Push to Hugging Face Hub
     hf_username = os.getenv("HF_USERNAME")
     hub_model_name = cfg.get("hub_model_name", None)
-    
+
     if hf_username and hub_model_name:
         push_to_hub(model, tokenizer, hub_model_name, hf_username)
     elif hf_username:
         # Default model name if not specified
         push_to_hub(model, tokenizer, "Qwen2.5-1.5B-QLoRA-Recipe0", hf_username)
     else:
-        print("\n💡 To push to Hugging Face Hub, set HF_USERNAME in .env file")
+        print("\n[INFO] To push to Hugging Face Hub, set HF_USERNAME in .env file")
 
 
 def push_to_hub(model, tokenizer, model_name, hf_username):
     """
     Push LoRA adapters and merged model to Hugging Face Hub.
-    Similar to Colab version but uses environment variables.
-    
-    Args:
-        model: The trained PEFT model (with LoRA adapters)
-        tokenizer: The tokenizer
-        model_name: Model name (e.g., "Qwen2.5-1.5B-QLoRA-Recipe0")
-        hf_username: Your Hugging Face username
+
+    This function uploads both the LoRA adapters (for efficient storage) and
+    the fully merged model (for easy inference) to Hugging Face Hub.
+
+    Parameters
+    ----------
+    model : PeftModel
+        The trained PEFT model with LoRA adapters attached.
+    tokenizer : PreTrainedTokenizer
+        The tokenizer associated with the model.
+    model_name : str
+        The name for the model on Hugging Face Hub (e.g., "Qwen2.5-1.5B-QLoRA-Recipe").
+    hf_username : str
+        Your Hugging Face username for the repository path.
+
+    Notes
+    -----
+    - Requires authentication via `huggingface-cli login` or HF_TOKEN environment variable
+    - Creates two repositories: one for adapters (-adapters suffix) and one for merged model
     """
     model_id = f"{hf_username}/{model_name}"
-    
+
     try:
-        print(f"\n📤 Pushing to Hugging Face Hub: {model_id}")
-        
+        print(f"\n[INFO] Pushing to Hugging Face Hub: {model_id}")
+
         # Push LoRA adapters
-        print("  → Pushing LoRA adapters...")
+        print("  -> Pushing LoRA adapters...")
         model.push_to_hub(f"{model_id}-adapters", private=False)
-        
+
         # Merge and push full model
-        print("  → Merging adapters and pushing full model...")
+        print("  -> Merging adapters and pushing full model...")
         merged_model = model.merge_and_unload()
         merged_model.push_to_hub(model_id, private=False)
-        
+
         # Push tokenizer
-        print("  → Pushing tokenizer...")
+        print("  -> Pushing tokenizer...")
         tokenizer.push_to_hub(model_id)
-        
-        print(f"\n✅ Successfully pushed to: https://huggingface.co/{model_id}")
-        print(f"   Adapters: https://huggingface.co/{model_id}-adapters")
-        
+
+        print(f"\n[INFO] Successfully pushed to: https://huggingface.co/{model_id}")
+        print(f"       Adapters: https://huggingface.co/{model_id}-adapters")
+
     except Exception as e:
-        print(f"\n❌ Error pushing to Hugging Face: {e}")
-        print("   Make sure you're logged in with: huggingface-cli login")
-        print("   Or set HF_TOKEN in your .env file")
+        print(f"\n[ERROR] Error pushing to Hugging Face: {e}")
+        print("        Make sure you're logged in with: huggingface-cli login")
+        print("        Or set HF_TOKEN in your .env file")
 
 
 # ---------------------------------------------------------------------------

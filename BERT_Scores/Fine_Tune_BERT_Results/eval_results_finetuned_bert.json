@@ -1,0 +1,8 @@
+{
+  "finetuned_model_id": "Daniel-Krasik/Qwen2.5-1.5B-QLoRA-Recipe",
+  "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "num_samples": 200,
+  "bert_precision": 0.8152858018875122,
+  "bert_recall": 0.8560771346092224,
+  "bert_f1": 0.8350949287414551
+}

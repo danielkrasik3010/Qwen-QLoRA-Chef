@@ -1,0 +1,16 @@
+# Evaluation benchmarks
+enable_benchmarks: true
+
+# Benchmark settings
+mmlu_samples: 33
+mmlu_subjects:
+  - high_school_psychology
+  - logical_fallacies
+  - moral_disputes
+
+hellaswag_samples: 100
+
+# Generation settings
+max_new_tokens: 200
+temperature: 0.7
+do_sample: false

@@ -1,9 +1,0 @@
-{
-  "rouge1": 0.4848035751135884,
-  "rouge2": 0.2830489346672995,
-  "rougeL": 0.39176641182249644,
-  "num_samples": 200,
-  "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
-  "adapter_source": "Daniel-Krasik/Qwen2.5-1.5B-QLoRA-Recipe-adapters",
-  "dataset": "skadewdl3/recipe-nlg-llama2"
-}

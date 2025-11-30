@@ -1,7 +1,30 @@
 """
 data_utils.py
+
 Utility functions for loading recipe datasets and preparing text samples for training or inference.
-Uses shared paths from paths.py for dataset caching and supports optional cache_dir from config.
+
+This module provides the core data handling infrastructure for the recipe generation project:
+    - Model configuration registry for different LLM architectures
+    - Dataset loading with local caching and Hugging Face integration
+    - Data validation and filtering for recipe samples
+    - Chat-style message construction for instruction-tuned models
+
+The module uses shared paths from paths.py for dataset caching and supports optional
+cache_dir overrides from configuration files.
+
+Supported Models:
+    - LLaMA (meta-llama/Llama-3.2-1B-Instruct)
+    - Mistral (mistralai/Mistral-7B-Instruct-v0.3)
+    - Gemma (google/gemma-2-9b-it)
+    - Qwen (Qwen/Qwen2.5-7B-Instruct)
+    - OLMo (allenai/OLMoE-1B-7B-0924-Instruct)
+
+Usage:
+    from utils.data_utils import load_and_prepare_dataset, build_messages_for_sample
+
+    cfg = load_config()
+    train, val, test = load_and_prepare_dataset(cfg)
+    messages = build_messages_for_sample(sample, task_instruction, cfg=cfg)
 """
 
 import os
@@ -10,7 +33,7 @@ from paths import DATASETS_DIR
 
 
 # ---------------------------------------------------------------------------
-# Model Configuration Registry (from evaluate_baseline_check.ipynb Cell 3)
+# Model Configuration Registry
 # ---------------------------------------------------------------------------
 
 MODEL_CONFIGS = {
@@ -60,8 +83,25 @@ def get_model_config_from_path(model_path: str):
     Args:
         model_path: Full model path (e.g., "meta-llama/Llama-3.2-1B-Instruct")
 
-    Returns:
-        Dictionary containing model configuration
+    Parameters
+    ----------
+    model_path : str
+        Full Hugging Face model path (e.g., "meta-llama/Llama-3.2-1B-Instruct").
+
+    Returns
+    -------
+    dict
+        A copy of the model configuration dictionary containing:
+        - path: The model's Hugging Face identifier
+        - supports_system: Whether the model supports system messages
+        - system_message: The default system prompt for recipe generation
+        - user_message_template: Template string for user messages with {ner} placeholder
+        - include_title_in_user: Whether to include recipe title in user message
+
+    Notes
+    -----
+    If the model path does not match any known configuration, defaults to LLaMA
+    format and logs a warning message.
     """
     model_path_lower = model_path.lower()
 
@@ -76,13 +116,12 @@ def get_model_config_from_path(model_path: str):
     elif "olmo" in model_path_lower:
         return MODEL_CONFIGS["olmo"].copy()
     else:
-        # Default to Llama format
         print(f"[WARNING] Unknown model path: {model_path}. Using Llama format as default.")
         return MODEL_CONFIGS["llama"].copy()
 
 
 # ---------------------------------------------------------------------------
-# Dataset Loading (from evaluate_baseline_check.ipynb Cell 4)
+# Dataset Loading
 # ---------------------------------------------------------------------------
 
 
@@ -90,12 +129,20 @@ def get_local_dataset_path(dataset_name: str, cache_dir: str = None) -> str:
     """
     Build a safe local path for storing datasets based on their Hugging Face name.
 
-    Args:
-        dataset_name (str): Hugging Face dataset identifier (e.g., 'skadewdl3/recipe-nlg-llama2').
-        cache_dir (str | None): Optional cache directory override (e.g., from config).
+    Converts Hugging Face dataset identifiers (which may contain slashes or colons)
+    into filesystem-safe directory names.
 
-    Returns:
-        str: Absolute path to local dataset folder.
+    Parameters
+    ----------
+    dataset_name : str
+        Hugging Face dataset identifier (e.g., "skadewdl3/recipe-nlg-llama2").
+    cache_dir : str, optional
+        Override cache directory. If None, uses the default DATASETS_DIR from paths.py.
+
+    Returns
+    -------
+    str
+        Absolute path to the local dataset folder.
     """
     safe_name = dataset_name.replace("/", "_").replace(":", "_")
     base_dir = cache_dir or DATASETS_DIR
@@ -104,9 +151,22 @@ def get_local_dataset_path(dataset_name: str, cache_dir: str = None) -> str:
 
 def select_subset(dataset, n_samples, seed=42):
     """
-    Select a subset of the dataset.
-    If n_samples is "all" or None, return the entire dataset.
-    Otherwise, sample n_samples examples.
+    Select a random subset of samples from a dataset.
+
+    Parameters
+    ----------
+    dataset : Dataset
+        Hugging Face Dataset object to sample from.
+    n_samples : int or str or None
+        Number of samples to select. If "all" or None, returns the entire dataset.
+        If greater than dataset size, returns all available samples with a warning.
+    seed : int, optional
+        Random seed for reproducible shuffling. Default is 42.
+
+    Returns
+    -------
+    Dataset
+        The selected subset of the dataset, or the full dataset if n_samples is "all" or None.
     """
     if n_samples == "all" or n_samples is None:
         return dataset
@@ -120,10 +180,37 @@ def select_subset(dataset, n_samples, seed=42):
 
 def load_and_prepare_dataset(cfg):
     """
-    Load recipe dataset splits according to configuration.
-    Ensures the FULL dataset is cached, filters invalid samples, and creates validation split if missing.
-    Supports both new-style ("dataset": {"splits": {...}}) and old-style (top-level keys) configs.
-    (from evaluate_baseline_check.ipynb Cell 4)
+    Load recipe dataset splits according to configuration settings.
+
+    This function handles the complete dataset preparation workflow:
+    1. Loads or downloads the dataset from Hugging Face (with local caching)
+    2. Filters out invalid samples missing required fields
+    3. Creates a validation split from training data if not present
+    4. Selects subsets according to configuration
+
+    Parameters
+    ----------
+    cfg : dict
+        Configuration dictionary supporting two formats:
+        - New format: {"dataset": {"name": ..., "splits": {...}, "seed": ...}}
+        - Old format: {"datasets": [{"path": ...}], "train_samples": ..., ...}
+
+    Returns
+    -------
+    tuple
+        A tuple of (train_dataset, val_dataset, test_dataset) containing the
+        prepared Hugging Face Dataset splits.
+
+    Raises
+    ------
+    KeyError
+        If neither "dataset" nor "datasets" key is found in the configuration.
+
+    Notes
+    -----
+    - The full dataset is always cached locally to avoid repeated downloads
+    - Invalid samples (missing title, ingredients, directions, or prompt) are filtered
+    - A validation split is automatically created from training data if not present
     """
     # -----------------------------------------------------------------------
     # Extract dataset configuration
@@ -165,7 +252,7 @@ def load_and_prepare_dataset(cfg):
     # Filter invalid samples (required for recipe datasets)
     # -----------------------------------------------------------------------
     def is_valid(sample):
-        """Check if sample has all required fields."""
+        """Check if sample has all required fields for recipe generation."""
         return (
             sample.get('title') is not None and str(sample.get('title', '')).strip() and
             sample.get('ingredients') is not None and str(sample.get('ingredients', '')).strip() and
@@ -210,24 +297,51 @@ def load_and_prepare_dataset(cfg):
 
 
 # ---------------------------------------------------------------------------
-# Prompt / Message Construction (from evaluate_baseline_check.ipynb Cell 8)
+# Prompt / Message Construction
 # ---------------------------------------------------------------------------
 
 
 def build_messages_for_sample(sample, task_instruction, include_assistant=False, cfg=None):
     """
     Build a chat-style message list for a recipe sample.
-    Handles model-specific differences (with/without system message support).
-    (Logic from evaluate_baseline_check.ipynb generate_predictions() Cell 8)
 
-    Args:
-        sample: Dictionary with recipe fields (NER, title, ingredients, directions)
-        task_instruction: Task instruction (kept for compatibility, not used directly)
-        include_assistant: If True, include the expected recipe output
-        cfg: Configuration dictionary (required for model config and field_map)
+    Constructs messages in the format expected by instruction-tuned models,
+    handling model-specific differences in system message support.
 
-    Returns:
-        List of message dictionaries with 'role' and 'content' keys
+    Parameters
+    ----------
+    sample : dict
+        Dictionary containing recipe fields:
+        - NER: Named entity recognition output (ingredient list)
+        - title: Recipe title
+        - ingredients: Full ingredient list
+        - directions: Cooking instructions
+    task_instruction : str
+        Task-level instruction. Kept for API compatibility but the actual
+        instruction is determined by model configuration.
+    include_assistant : bool, optional
+        If True, includes the expected recipe output as an assistant message.
+        Used for training data preparation. Default is False.
+    cfg : dict
+        Configuration dictionary containing base_model and field_map settings.
+        Required parameter.
+
+    Returns
+    -------
+    list[dict]
+        List of message dictionaries with 'role' and 'content' keys,
+        suitable for passing to tokenizer.apply_chat_template().
+
+    Raises
+    ------
+    ValueError
+        If cfg parameter is not provided.
+
+    Notes
+    -----
+    For models with system message support (e.g., LLaMA, Qwen), the system
+    message and user message are separate. For models without system support
+    (e.g., Mistral, Gemma), the system instruction is prepended to the user message.
     """
     if cfg is None:
         raise ValueError("cfg parameter is required for recipe dataset")
@@ -240,7 +354,7 @@ def build_messages_for_sample(sample, task_instruction, include_assistant=False,
 
     messages = []
 
-    # Build messages according to model type (same as preprocessing)
+    # Build messages according to model type
     if model_config['supports_system']:
         # Models with system message support: separate system and user
         messages.append({
@@ -266,7 +380,7 @@ def build_messages_for_sample(sample, task_instruction, include_assistant=False,
             "content": "\n\n".join(user_lines)
         })
 
-    # Add assistant response if requested
+    # Add assistant response if requested (for training data)
     if include_assistant:
         assistant_response = (
             f"Certainly! Here's a delicious recipe for:\n"
