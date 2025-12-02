@@ -53,7 +53,7 @@
 
 ---
 
-## 🎯 Project Overview
+##  Project Overview
 
 ### The Research Question
 
