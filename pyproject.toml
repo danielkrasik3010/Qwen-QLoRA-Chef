@@ -1,0 +1,173 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qwen-qlora-chef"
+version = "1.0.0"
+description = "Fine-tuning Qwen2.5-1.5B for Recipe Generation using QLoRA"
+readme = "README.md"
+license = {text = "CC-BY-NC-SA-4.0"}
+authors = [
+    {name = "Daniel Krasik", email = "daniel.krasik3010@gmail.com"}
+]
+maintainers = [
+    {name = "Daniel Krasik", email = "daniel.krasik@gmail.com"}
+]
+keywords = [
+    "nlp",
+    "llm",
+    "fine-tuning",
+    "qlora",
+    "lora",
+    "qwen",
+    "recipe-generation",
+    "transformers",
+    "machine-learning",
+    "deep-learning",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: Other/Proprietary License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: Linguistic",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.0.0",
+    "transformers>=4.35.0",
+    "datasets>=2.14.0",
+    "peft>=0.6.0",
+    "bitsandbytes>=0.41.0",
+    "accelerate>=0.24.0",
+    "evaluate>=0.4.0",
+    "rouge_score",
+    "wandb>=0.15.0",
+    "python-dotenv>=1.0.0",
+    "PyYAML>=6.0",
+    "tqdm>=4.65.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.9.0",
+    "isort>=5.12.0",
+    "flake8>=6.1.0",
+    "mypy>=1.5.0",
+    "pre-commit>=3.4.0",
+]
+notebooks = [
+    "jupyter>=1.0.0",
+    "ipykernel>=6.25.0",
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+    "pandas>=2.0.0",
+]
+openai = [
+    "openai>=1.0.0",
+]
+all = [
+    "qwen-qlora-chef[dev,notebooks,openai]",
+]
+
+[project.urls]
+Homepage = "https://github.com/Daniel-Krasik/Qwen-QLoRA-Chef"
+Documentation = "https://github.com/Daniel-Krasik/Qwen-QLoRA-Chef#readme"
+Repository = "https://github.com/Daniel-Krasik/Qwen-QLoRA-Chef.git"
+Issues = "https://github.com/Daniel-Krasik/Qwen-QLoRA-Chef/issues"
+Changelog = "https://github.com/Daniel-Krasik/Qwen-QLoRA-Chef/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["code*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.yml"]
+
+# ============================================================================
+# Tool Configurations
+# ============================================================================
+
+[tool.black]
+line-length = 100
+target-version = ['py310', 'py311', 'py312']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | __pycache__
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip_gitignore = true
+skip = [".gitignore", ".dockerignore"]
+known_first_party = ["code", "utils"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+exclude = [
+    "venv",
+    ".venv",
+    "build",
+    "dist",
+]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "gpu: marks tests that require GPU",
+]
+
+[tool.coverage.run]
+source = ["code"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+

@@ -63,19 +63,19 @@ target_modules: ["q_proj", "v_proj"]
 # Training Configuration
 # ==============================================
 num_epochs: 1
-max_steps: 50  # Reduced for DDP testing - increase after it works
+max_steps: 300
 learning_rate: 2e-4
-batch_size: 2  # Reduced for DDP stability - can increase after testing
-gradient_accumulation_steps: 8  # Increased to compensate for smaller batch_size
+batch_size: 4
+gradient_accumulation_steps: 4
 sequence_len: 512 # works well for the recipe dataset
 lr_scheduler: cosine
-warmup_steps: 25  # Reduced proportionally with max_steps
+warmup_steps: 50
 bf16: true
-logging_steps: 10  # More frequent logging to monitor progress
-save_steps: 50  # Save at end of this test run
+logging_steps: 25
+save_steps: 100
 save_total_limit: 2
 optim: paged_adamw_8bit
-gradient_checkpointing: true  # Enable to reduce memory and potentially help with DDP
+gradient_checkpointing: true
 
 # ==============================================
 # Output & Logging
